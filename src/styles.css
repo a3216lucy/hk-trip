@@ -1,1 +1,96 @@
-/* You can add global styles to this file, and also import other style files */
+@import "tailwindcss";
+@import "primeicons/primeicons.css";
+
+@theme {
+  --font-sans: "Noto Sans TC", system-ui, sans-serif;
+  /* 色票：#202C39 #283845 #B8B08D #F2D492 #F29559（淺色/深色變體為推算） */
+  --color-navy: #202C39;
+  --color-navy-2: #283845;
+  --color-khaki: #B8B08D;
+  --color-sand: #F2D492;
+  --color-orange: #F29559;
+  --color-bg: #F5F1E7;
+  --color-surface: #ffffff;
+  --color-border: #E4DECE;
+  --color-ink: #202C39;
+  --color-muted: #5C6775;
+  --color-accent: #283845;
+  --color-accent-soft: #FBEFCB;
+  --color-border-strong: #D4CDB8;
+  --color-faint: #93918A;
+  --color-ink-700: #36475A;
+  --color-on-dark: #F5F1E7;
+  --color-on-dark-muted: #9AA6B2;
+  --color-orange-soft: #FBE0CC;
+  --color-sage-soft: #E7E2D2;
+  --color-success: #5B8C6E;
+  --color-success-soft: #DDEADF;
+  --color-gold-text: #B98900;
+  --color-ok: #007B22;
+  --color-ok-soft: #E5F4EA;
+  --color-warn: #C62828;
+  --color-warn-soft: #FDECEA;
+}
+
+html, body { background: var(--color-bg); color: var(--color-ink); font-family: var(--font-sans); -webkit-font-smoothing: antialiased; }
+body { margin: 0; padding-bottom: env(safe-area-inset-bottom); }
+.mono { font-family: ui-monospace, "SF Mono", Menlo, monospace; }
+.field { display: flex; flex-direction: column; gap: 4px; font-size: 14px; color: var(--color-muted); }
+.panel { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 10px; }
+
+/* PrimeNG Timeline：隱藏左側 opposite，讓「線＋圖示」在左、內容在右 */
+.trip-timeline .p-timeline-event { flex-direction: row !important; min-height: 0 !important; }
+.trip-timeline .p-timeline-event-opposite { display: none !important; }
+.trip-timeline .p-timeline-event-separator { flex: 0 0 2.75rem; align-items: center; }
+.trip-timeline .p-timeline-event-connector { background: var(--color-border); width: 2px; }
+.trip-timeline .p-timeline-event-content { flex: 1; min-width: 0; padding: 0 0 0 0.75rem !important; text-align: left !important; }
+.trip-timeline .p-panel-header { padding: 0.75rem !important; align-items: flex-start; }
+.trip-timeline .p-panel-content { padding: 0 0.75rem 0.75rem !important; }
+.trip-timeline .p-panel-title { flex: 1; min-width: 0; }
+
+/* 深藍頁首：標題淡黃、分頁用橘色底線 */
+.app-header { background: var(--color-navy); color: #fff;
+  --p-tabs-tablist-background: transparent;
+  --p-tabs-tablist-border-color: transparent;
+  --p-tabs-tab-background: transparent;
+  --p-tabs-tab-hover-background: transparent;
+  --p-tabs-tab-active-background: transparent;
+  --p-tabs-tab-color: #B8B08D;
+  --p-tabs-tab-hover-color: #F2D492;
+  --p-tabs-tab-active-color: #F2D492;
+  --p-tabs-active-bar-background: #F29559;
+}
+.app-header .p-tabs, .app-header .p-tablist-tab-list { background: transparent; }
+/* 一般分頁（Day）：橘色底線 */
+.p-tabs { --p-tabs-active-bar-background: #F29559; }
+.p-tablist-active-bar { background: var(--color-orange) !important; }
+
+/* 表單欄位統一成設計稿樣式：淺底、卡其色邊框、大圓角 */
+.p-inputtext, .p-inputnumber-input { background: #FAF7EF; border: 1px solid var(--color-border-strong); border-radius: 14px; padding: 12px 14px; font-size: 14px; color: var(--color-ink); box-shadow: none; }
+.p-inputtext:focus, .p-inputnumber-input:focus { border-color: var(--color-orange); }
+.p-select, .p-datepicker .p-inputtext { background: #FAF7EF; border-color: var(--color-border-strong); border-radius: 14px; }
+.p-dialog { border-radius: 20px; }
+.seg { display: flex; gap: 4px; padding: 4px; background: #FAF7EF; border-radius: 14px; }
+.seg > button { flex: 1; padding: 8px 0; border-radius: 9px; border: 1px solid transparent; font-size: 13px; font-weight: 500; color: var(--color-muted); }
+.seg > button[aria-checked="true"] { background: #fff; border-color: var(--color-border-strong); color: var(--color-ink); font-weight: 700; }
+
+/* 行李清單勾選框：橘色方塊；筆記勾選：綠色圓圈 */
+.pack-check { --p-checkbox-width: 22px; --p-checkbox-height: 22px; --p-checkbox-border-radius: 6px;
+  --p-checkbox-background: #FAF7EF; --p-checkbox-border-color: #D4CDB8;
+  --p-checkbox-checked-background: #F29559; --p-checkbox-checked-border-color: #F29559;
+  --p-checkbox-checked-hover-background: #F29559; --p-checkbox-checked-hover-border-color: #F29559;
+  --p-checkbox-icon-checked-color: #fff; --p-checkbox-icon-checked-hover-color: #fff; --p-checkbox-icon-size: 13px; }
+.note-check { --p-checkbox-width: 22px; --p-checkbox-height: 22px; --p-checkbox-border-radius: 999px;
+  --p-checkbox-background: #FAF7EF; --p-checkbox-border-color: #D4CDB8;
+  --p-checkbox-checked-background: #DDEADF; --p-checkbox-checked-border-color: #5B8C6E;
+  --p-checkbox-checked-hover-background: #DDEADF; --p-checkbox-checked-hover-border-color: #5B8C6E;
+  --p-checkbox-icon-checked-color: #5B8C6E; --p-checkbox-icon-checked-hover-color: #5B8C6E; --p-checkbox-icon-size: 13px; }
+.p-progressbar { --p-progressbar-background: #EFE9DA; --p-progressbar-value-background: #F29559; --p-progressbar-border-radius: 999px; }
+
+/* 彈窗：底部按鈕列固定，與可捲動內容之間加分隔線與留白 */
+.p-dialog { overflow: hidden; }
+.p-dialog-content { padding-bottom: 1rem !important; }
+.p-dialog-footer { border-top: 1px solid var(--color-border); padding: 0.875rem 1.25rem !important; background: #fff; }
+
+/* 選單裡的刪除項目：紅色 */
+.hk-danger .p-menu-item-link, .hk-danger .p-menu-item-icon, .hk-danger .p-menu-item-label { color: var(--color-warn) !important; }

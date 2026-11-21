@@ -1,0 +1,20 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 密碼的 SHA-256 雜湊就是 trips 的文件 ID：知道密碼的人才組得出路徑。
+    // 不允許列出 trips（list），所以沒有密碼就看不到任何旅行。
+    match /trips/{tripKey} {
+      allow get, create, update: if true;
+      allow list, delete: if false;
+
+      match /{sub}/{id} {
+        allow read, write: if true;
+      }
+    }
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
+
+
