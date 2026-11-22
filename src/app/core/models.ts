@@ -27,6 +27,7 @@ export interface Item {
   order: number;
   travelMode: TravelMode; // 從「上一站」過來的交通
   travelMin: number; // 交通時間（分鐘），0＝不填
+  travelNote?: string; // 這段交通的說明（搭哪條線、哪個出口、走多遠），顯示在時間軸的交通列下面
   travelLabel?: string; // travelMode 是 'other' 時，使用者自己輸入的交通方式名稱
   subs: Sub[];
   photos?: string[]; // 招牌菜或門面圖片網址（選填，外部連結）

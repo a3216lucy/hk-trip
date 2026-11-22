@@ -245,32 +245,44 @@ interface Draft {
               <div class="flex w-10 shrink-0 justify-center">
                 <div class="w-0.5 bg-border-strong"></div>
               </div>
-              <button
-                type="button"
-                class="flex min-w-0 items-center gap-2 py-3 text-left text-[13.5px] font-medium text-muted"
-                (click)="openTransport(it)"
-              >
-                @if (it.travelMode || it.travelMin) {
-                  <app-icon [name]="modeIcon(it.travelMode)" [size]="16" />
-                  <span
-                    >{{ modeLabel(it.travelMode, it.travelLabel) }} → {{ it.title }}
-                    @if (it.travelMin) {
-                      · 約 {{ dur(it.travelMin) }}
+              <div class="flex min-w-0 flex-1 items-start gap-2">
+                <div class="min-w-0 flex-1">
+                  <button
+                    type="button"
+                    class="flex min-w-0 items-center gap-2 py-3 text-left text-[13.5px] font-medium text-muted"
+                    (click)="openTransport(it)"
+                  >
+                    @if (it.travelMode || it.travelMin) {
+                      <app-icon [name]="modeIcon(it.travelMode)" [size]="16" />
+                      <span
+                        >{{ modeLabel(it.travelMode, it.travelLabel) }} → {{ it.title }}
+                        @if (it.travelMin) {
+                          · 約 {{ dur(it.travelMin) }}
+                        }
+                      </span>
+                    } @else {
+                      <app-icon name="plus" [size]="14" /><span>加交通</span>
                     }
-                  </span>
-                } @else {
-                  <app-icon name="plus" [size]="14" /><span>加交通</span>
+                  </button>
+                  @if (it.travelNote) {
+                    <p
+                      class="-mt-1.5 mb-2 whitespace-pre-line break-words text-[13px] leading-snug text-ink-700"
+                      (click)="openTransport(it)"
+                    >
+                      {{ it.travelNote }}
+                    </p>
+                  }
+                </div>
+                @if (legUrl(i); as url) {
+                  <a
+                    class="mt-2.5 flex shrink-0 items-center gap-1 rounded-full border border-border bg-white px-2.5 py-1 text-xs font-semibold text-navy-2"
+                    [href]="url"
+                    target="_blank"
+                    rel="noopener"
+                    ><app-icon name="navigation" [size]="13" /> 查路線</a
+                  >
                 }
-              </button>
-              @if (legUrl(i); as url) {
-                <a
-                  class="my-auto ml-auto flex shrink-0 items-center gap-1 rounded-full border border-border bg-white px-2.5 py-1 text-xs font-semibold text-navy-2"
-                  [href]="url"
-                  target="_blank"
-                  rel="noopener"
-                  ><app-icon name="navigation" [size]="13" /> 查路線</a
-                >
-              }
+              </div>
             </div>
           }
           <div class="flex gap-3.5">
@@ -619,6 +631,15 @@ interface Draft {
             placeholder="例如 20"
         /></label>
       </div>
+      <label class="field mt-3"
+        >交通說明（搭哪條線、哪個出口、走多遠）<textarea
+          pTextarea
+          rows="4"
+          class="w-full"
+          [(ngModel)]="tDraft.note"
+          placeholder="例如：「上環站」A2 出口，走約 3 分"
+        ></textarea>
+      </label>
       @if (tDraft.mode === 'other') {
         <label class="field mt-3"
           >交通方式名稱<input
@@ -1074,7 +1095,7 @@ export class ItineraryTab {
     text3: '',
   };
   readonly transportId = signal<string | null>(null);
-  tDraft = { mode: '' as TravelMode, min: null as number | null, label: '' };
+  tDraft = { mode: '' as TravelMode, min: null as number | null, label: '', note: '' };
 
   /** 外部圖片載入失敗（連結失效或被擋）就隱藏，不留破圖 */
   hideImg(e: Event) {
@@ -1238,6 +1259,7 @@ export class ItineraryTab {
       mode: it.travelMode ?? '',
       min: it.travelMin || null,
       label: it.travelLabel ?? '',
+      note: it.travelNote ?? '',
     };
     this.transportId.set(it.id);
   }
@@ -1249,6 +1271,7 @@ export class ItineraryTab {
       travelMode: this.tDraft.mode ?? '',
       travelMin: Number(this.tDraft.min) || 0,
       travelLabel: this.tDraft.mode === 'other' ? this.tDraft.label.trim() : '',
+      travelNote: this.tDraft.note.trim(),
     });
     this.transportId.set(null);
   }

@@ -257,9 +257,19 @@ function legacyRows(n: Note): NoteRow[] {
                   @case ('kv') {
                     <div class="flex items-start justify-between gap-3 py-[11px] text-[13px]">
                       <span class="shrink-0 text-muted">{{ r.a }}</span>
-                      <span class="break-words text-right text-[13.5px] font-semibold">{{
-                        r.b
-                      }}</span>
+                      @if (isUrl(r.b)) {
+                        <a
+                          class="inline-flex min-w-0 items-center gap-1 text-right text-[13.5px] font-semibold text-navy-2 underline"
+                          [href]="r.b"
+                          target="_blank"
+                          rel="noopener"
+                          >開啟連結 <app-icon name="external" [size]="14"
+                        /></a>
+                      } @else {
+                        <span class="min-w-0 break-words text-right text-[13.5px] font-semibold">{{
+                          r.b
+                        }}</span>
+                      }
                     </div>
                   }
                 }
