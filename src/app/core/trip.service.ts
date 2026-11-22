@@ -64,33 +64,33 @@ export class TripService {
     if (!snap.exists()) return false;
     await this.migrateLegacyItems(key);
     // 行程已經換成最終版（v2-開頭的站存在）就不要再跑任何改行程的搬移，免得蓋掉你在網站上改過的內容。
-    // 這也包含資料庫裡標記不完整的情況：只要最終版存在，就補記 planV2。
+    // 最終版存在之後，所有一次性搬移（行程、筆記、行李）一律不再執行，資料以資料庫裡現在的內容為準。
     const itineraryDone = (await getDoc(doc(this.db!, 'trips', key, 'items', 'v2-000'))).exists();
     if (itineraryDone && snap.data()['planV2'] !== true) await setDoc(doc(this.db!, 'trips', key), { planV2: true }, { merge: true });
     if (!itineraryDone) await this.ensureHotelStarts(key, snap.data()['hotelStarts'] === true);
     if (!itineraryDone) await this.ensureHotelInfo(key, snap.data()['hotelInfo'] === true);
-    await this.ensureNotesV2(key, snap.data()['notesV2'] === true);
-    await this.ensureHalfSlash(key, snap.data()['slashFix'] === true);
-    await this.ensureCabinReminders(key, snap.data()['cabinNote'] === true);
-    await this.tidyReminders(key, snap.data()['reminderTidy'] === true);
-    await this.ensurePackExtras(key, snap.data()['packExtras'] === true);
-    await this.ensurePackExtras2(key, snap.data()['packExtras2'] === true);
-    await this.ensurePackExtras3(key, snap.data()['packExtras3'] === true);
-    await this.ensurePackExtras4(key, snap.data()['packExtras4'] === true);
-    await this.moveEsim(key, snap.data()['esimMoved'] === true);
-    await this.moveCarryOn(key, snap.data()['carryMoved'] === true);
-    await this.ensurePackExtras5(key, snap.data()['packExtras5'] === true);
-    await this.fixBreakfastNote(key, snap.data()['breakfastNote'] === true);
-    await this.renameShower(key, snap.data()['showerRename'] === true);
-    await this.addMealsInfo(key, snap.data()['mealsNote'] === true);
-    await this.ensurePackExtras6(key, snap.data()['packExtras6'] === true);
-    await this.addPlanCards(key, snap.data()['planCards'] === true);
-    await this.fixEntryDocs(key, snap.data()['entryDocs'] === true);
+    if (!itineraryDone) await this.ensureNotesV2(key, snap.data()['notesV2'] === true);
+    if (!itineraryDone) await this.ensureHalfSlash(key, snap.data()['slashFix'] === true);
+    if (!itineraryDone) await this.ensureCabinReminders(key, snap.data()['cabinNote'] === true);
+    if (!itineraryDone) await this.tidyReminders(key, snap.data()['reminderTidy'] === true);
+    if (!itineraryDone) await this.ensurePackExtras(key, snap.data()['packExtras'] === true);
+    if (!itineraryDone) await this.ensurePackExtras2(key, snap.data()['packExtras2'] === true);
+    if (!itineraryDone) await this.ensurePackExtras3(key, snap.data()['packExtras3'] === true);
+    if (!itineraryDone) await this.ensurePackExtras4(key, snap.data()['packExtras4'] === true);
+    if (!itineraryDone) await this.moveEsim(key, snap.data()['esimMoved'] === true);
+    if (!itineraryDone) await this.moveCarryOn(key, snap.data()['carryMoved'] === true);
+    if (!itineraryDone) await this.ensurePackExtras5(key, snap.data()['packExtras5'] === true);
+    if (!itineraryDone) await this.fixBreakfastNote(key, snap.data()['breakfastNote'] === true);
+    if (!itineraryDone) await this.renameShower(key, snap.data()['showerRename'] === true);
+    if (!itineraryDone) await this.addMealsInfo(key, snap.data()['mealsNote'] === true);
+    if (!itineraryDone) await this.ensurePackExtras6(key, snap.data()['packExtras6'] === true);
+    if (!itineraryDone) await this.addPlanCards(key, snap.data()['planCards'] === true);
+    if (!itineraryDone) await this.fixEntryDocs(key, snap.data()['entryDocs'] === true);
     if (!itineraryDone) await this.addDay1Plan(key, snap.data()['day1Plan'] === true);
     if (!itineraryDone) await this.tweakCards1(key, snap.data()['cardTweak1'] === true);
-    await this.ensurePackExtras7(key, snap.data()['packExtras7'] === true);
+    if (!itineraryDone) await this.ensurePackExtras7(key, snap.data()['packExtras7'] === true);
     if (!itineraryDone) await this.clearHotelTime(key, snap.data()['hotelEta'] === true);
-    await this.todoFirst(key, snap.data()['todoFirst'] === true);
+    if (!itineraryDone) await this.todoFirst(key, snap.data()['todoFirst'] === true);
     if (!itineraryDone) await this.syncDays(key, snap.data()['daysSync3'] === true);
     if (!itineraryDone) await this.syncPlaceInfo(key, snap.data()['placeInfo1'] === true);
     if (!itineraryDone) await this.addStarPicks(key, snap.data()['starPicks1'] === true);
@@ -109,8 +109,8 @@ export class TripService {
     if (!itineraryDone) await this.sisterWah(key, snap.data()['sisterWah1'] === true);
     if (!itineraryDone) await this.day1Fix(key, snap.data()['day1Fix1'] === true);
     if (!itineraryDone) await this.planV2(key, snap.data()['planV2'] === true);
-    await this.dimSumBranches(key, snap.data()['dimSum1'] === true);
-    await this.moveScale(key, snap.data()['scaleMoved'] === true);
+    if (!itineraryDone) await this.dimSumBranches(key, snap.data()['dimSum1'] === true);
+    if (!itineraryDone) await this.moveScale(key, snap.data()['scaleMoved'] === true);
     this.start(key, (snap.data()['members'] as string[]) ?? []);
     return true;
   }
