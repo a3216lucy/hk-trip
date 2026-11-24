@@ -213,7 +213,7 @@ const curOf = (c?: string) => CURRENCIES.find((x) => x.code === c) ?? CURRENCIES
       [draggable]="false"
       [dismissableMask]="true"
       [header]="f.id ? '編輯花費' : '記一筆'"
-      [style]="{ width: 'min(32rem, 94vw)', maxHeight: '92vh' }"
+      [style]="{ width: 'min(32rem, 94vw)', maxHeight: '88dvh' }"
     >
       <ng-container *ngTemplateOutlet="formTpl" />
       <ng-template #footer>
