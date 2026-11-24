@@ -89,7 +89,8 @@ body { margin: 0; padding-bottom: env(safe-area-inset-bottom); }
 
 /* 彈窗：底部按鈕列固定，與可捲動內容之間加分隔線與留白 */
 .p-dialog { overflow: hidden; }
-.p-dialog-content { padding-bottom: 1rem !important; }
+.p-dialog-content { padding-bottom: 1rem !important; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+.p-dialog-header, .p-dialog-footer { flex-shrink: 0; }
 .p-dialog-footer { border-top: 1px solid var(--color-border); padding: 0.875rem 1.25rem !important; background: #fff; }
 
 /* 選單裡的刪除項目：紅色 */
