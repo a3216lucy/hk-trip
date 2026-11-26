@@ -692,15 +692,38 @@ export class TripService {
     await batch.commit();
   }
 
-  /** 一次性（11/26 下午）：照你的要求刪掉第 3 天的「一點心」站。 */
+  /** 一次性（11/26 下午）：刪掉第 3 天的「一點心」站；晚餐選項改成走路優先、搭車的放後面當備案。 */
   private async dropDimSum(key: string, done: boolean) {
     if (done) return;
     const col = collection(this.db!, 'trips', key, 'items');
     const docs = (await getDocs(col)).docs;
     const batch = writeBatch(this.db!);
-    docs
-      .filter((d) => d.data()['day'] === '2026-11-26' && /一點心/.test(String(d.data()['title'] ?? '')))
-      .forEach((d) => batch.delete(d.ref));
+    const day3 = docs.filter((d) => d.data()['day'] === '2026-11-26');
+    const find = (re: RegExp) => day3.find((d) => re.test(String(d.data()['title'] ?? '')));
+    day3.filter((d) => /一點心/.test(String(d.data()['title'] ?? ''))).forEach((d) => batch.delete(d.ref));
+
+    // 晚餐選項照「走路能到」排前面，要搭車的放最後當備案；清真牛肉館搬到走路就到的九龍城寨那站。
+    const hotpot = find(/鵝頸橋|四季火鍋/);
+    const walled = find(/九龍城寨/);
+    let halal: Sub | undefined;
+    if (hotpot) {
+      const subs = (hotpot.data()['subs'] ?? []) as Sub[];
+      halal = subs.find((x) => x.name.includes('清真牛肉館'));
+      const wah = subs.find((x) => x.name.includes('華姐'));
+      const hing = subs.find((x) => x.name.includes('興記'));
+      const others = subs.filter((x) => x !== halal && x !== wah && x !== hing);
+      const next: Sub[] = [...others];
+      if (wah) next.push({ ...wah, name: '備選（走路約 15 分或坐一站）：華姐清湯腩（天后總店，必比登）' });
+      if (hing) next.push({ ...hing, name: '備案（要搭車過海）：興記菜館煲仔飯（廟街）' });
+      batch.update(hotpot.ref, { subs: next });
+    }
+    if (walled && halal) {
+      const subs = [...((walled.data()['subs'] ?? []) as Sub[])];
+      if (!subs.some((x) => x.name.includes('清真牛肉館'))) {
+        subs.push({ ...halal, name: '順路點心：清真牛肉館（走路 5–10 分）', note: '打鼓嶺道 33–35 號，逛完城寨走過去。招牌牛肉餅一份 2 件約 $50，很多肉汁、很燙。要搭枱、有最低消費、店內禁酒。' });
+        batch.update(walled.ref, { subs });
+      }
+    }
     batch.set(doc(this.db!, 'trips', key), { dropDimSum1: true }, { merge: true });
     await batch.commit();
   }
