@@ -753,7 +753,7 @@ export class TripService {
    * 一次性（11/26 傍晚，已離開女人街）：第 3 天後半段改成 旺角 → PMQ → 晚餐 → 回飯店。
    * - 新增 PMQ 站（905 巴士到海港政府大樓 → 中環街市 → 半山扶梯）；
    * - 新增晚餐站：九記牛腩（清湯腩，PMQ 走路就到），備選坤記煲仔小菜；
-   * - 超市、鵝頸橋火鍋移到備選（不刪除）；
+   * - 刪除超市、鵝頸橋火鍋兩站；
    * - 回飯店改成從上環／中環出發。
    * 新站已存在就跳過。
    */
@@ -773,8 +773,8 @@ export class TripService {
       : !isNaN(ho) ? [ho - 0.6, ho - 0.3]
       : [Date.now(), Date.now() + 1];
 
-    // 今晚不去了：移到備選，保留原本內容。
-    day3.filter((d) => /超市|鵝頸橋|四季火鍋/.test(String(d.data()['title'] ?? ''))).forEach((d) => batch.update(d.ref, { day: 'pool', order: Date.now() }));
+    // 今晚不去了：刪除原本的超市、鵝頸橋火鍋（含裡面的晚餐選項）。
+    day3.filter((d) => /超市|鵝頸橋|四季火鍋/.test(String(d.data()['title'] ?? ''))).forEach((d) => batch.delete(d.ref));
 
     if (!find(/^PMQ/)) {
       const item: Omit<Item, 'id'> = {
