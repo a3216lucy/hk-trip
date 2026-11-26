@@ -741,6 +741,7 @@ export class TripService {
             hours: '開幕未確認，出發前用地圖查',
             note: '天后總店是必比登推介的清湯牛腩。2026 年 5 月有報導說佐敦白加士街（澳洲牛奶公司那條街）要開分店，若已開幕可取代煲仔飯。可用現金、八達通、支付寶。',
             done: false,
+            photo: 'https://prod-pics.guide.michelin.com/api/public/content/c8dc1c2eebc5468c967caf573718eb13.jpeg?format=jpeg&w=600&h=600',
           },
           {
             name: '備案：九龍城泰國菜（逛完城寨時吃）',
@@ -757,6 +758,12 @@ export class TripService {
         ],
       };
       batch.set(doc(col), item);
+    }
+
+    // 早上加的 Bakehouse（中環）站補一張蛋塔圖；已經有圖就不動。
+    const bake = find(/bakehouse/i);
+    if (bake && !((bake.data()['photos'] as string[] | undefined)?.length)) {
+      batch.update(bake.ref, { photos: ['https://d3h1lg3ksw6i6b.cloudfront.net/media/image/2025/06/09/5f4cc11ddb434df2aae28c60365f4581___Bakehouse_egg_tart_sourdough.jpg'] });
     }
 
     batch.set(doc(this.db!, 'trips', key), { thursdayDinner1: true }, { merge: true });
