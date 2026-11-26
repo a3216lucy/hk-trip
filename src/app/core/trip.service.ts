@@ -111,6 +111,8 @@ export class TripService {
     if (!itineraryDone) await this.planV2(key, snap.data()['planV2'] === true);
     if (!itineraryDone) await this.dimSumBranches(key, snap.data()['dimSum1'] === true);
     if (!itineraryDone) await this.moveScale(key, snap.data()['scaleMoved'] === true);
+    // 例外：只「新增」選項與一個新站、在備註後面補一句，不改你已經編輯過的欄位，所以最終版之後也照樣跑一次。
+    await this.thursdayEats(key, snap.data()['thursdayEats1'] === true);
     this.start(key, (snap.data()['members'] as string[]) ?? []);
     return true;
   }
@@ -685,6 +687,102 @@ export class TripService {
     apply('2026-11-27', /早餐|蛋塔/, /^早餐：買蛋塔/, ['title', 'hours', 'address', 'note']);
     apply('2026-11-27', /^退房，?從雅格飯店出發/, /^退房，從雅格飯店出發/, ['note']);
     batch.set(doc(this.db!, 'trips', key), { starPicks2: true }, { merge: true });
+    await batch.commit();
+  }
+
+  /**
+   * 一次性（11/26 當天加的）：
+   * 1. 出發後先到中環：早餐蘭芳園（西多士、絲襪奶茶），備選興記咖啡室、勝香園。
+   * 2. 接著 Bakehouse 中環店：現吃，並預約 11/27 早上在同一間取的蛋塔。
+   * 3. 一點心改成從中環站出發（荃灣線起點直達太子），交通時間跟著改。
+   * 4. 11/27 的 Bakehouse 站備註後面補一句：先到香港站託運行李，再空手去取。
+   * 新站已存在就跳過，不重複新增。
+   */
+  private async thursdayEats(key: string, done: boolean) {
+    if (done) return;
+    const D3 = '2026-11-26';
+    const col = collection(this.db!, 'trips', key, 'items');
+    const docs = (await getDocs(col)).docs;
+    const day3 = docs.filter((d) => d.data()['day'] === D3);
+    const find = (re: RegExp, list = day3) => list.find((d) => re.test(String(d.data()['title'] ?? '')));
+    const ord = (d?: { data(): Record<string, unknown> }) => (d ? Number(d.data()['order']) : NaN);
+    const batch = writeBatch(this.db!);
+
+    const start = find(/出發/);
+    const dim = find(/一點心/);
+    const orders = day3.map((d) => Number(d.data()['order']) || 0);
+    const so = ord(start);
+    const dmo = ord(dim);
+    const [o1, o2] = !isNaN(so) && !isNaN(dmo) && so < dmo ? [so + (dmo - so) / 3, so + ((dmo - so) * 2) / 3]
+      : !isNaN(dmo) ? [dmo - 0.6, dmo - 0.3]
+      : !isNaN(so) ? [so + 0.3, so + 0.6]
+      : [(orders.length ? Math.min(...orders) : 0) - 0.6, (orders.length ? Math.min(...orders) : 0) - 0.3];
+
+    if (!find(/蘭芳園/)) {
+      const item: Omit<Item, 'id'> = {
+        day: D3,
+        type: 'food',
+        title: '早餐：蘭芳園（中環）',
+        time: '',
+        endTime: '',
+        stay: 40,
+        hours: '週一至六 07:30–18:00（週日休），只收現金',
+        address: '中環結志街 2 號',
+        note: '港式西多士、絲襪奶茶的老店，也可以點豬扒包。吃完走 2–3 分鐘到 Bakehouse。',
+        done: false,
+        order: o1,
+        travelMode: 'mrt',
+        travelMin: 30,
+        travelNote: '黃竹坑 → 金鐘轉荃灣線坐一站到中環，D2 出口走約 6 分鐘。',
+        subs: [
+          {
+            name: '備選：興記咖啡室（中環）',
+            hours: '早上 06:00 開（來源：鏡週刊）',
+            note: '鐵板煎的傳統西多士（不油炸），放牛油、淋煉乳。在摩羅上街附近，從 Bakehouse 走過去約 10 分鐘，地址出發前用地圖確認。',
+            done: false,
+          },
+          {
+            name: '備選：勝香園（中環）',
+            hours: '開門時間未查到，週日休',
+            note: '露天大排檔，招牌蕃茄牛肉通粉、檸蜜脆脆（沒有西多士）。中環美輪街 2 號，離 Bakehouse 很近。',
+            done: false,
+          },
+        ],
+      };
+      batch.set(doc(col), item);
+    }
+
+    if (!find(/bakehouse/i)) {
+      const item: Omit<Item, 'id'> = {
+        day: D3,
+        type: 'food',
+        title: 'Bakehouse 蛋塔（中環）',
+        time: '',
+        endTime: '',
+        stay: 15,
+        hours: '週一至日 08:00–21:00',
+        address: '中環士丹頓街 5 號嘉彩閣地舖',
+        note: '現吃，並預約明天（11/27）早上在這間取的蛋塔。早上剛開店，貨比晚上多。',
+        done: false,
+        order: o2,
+        travelMode: 'walk',
+        travelMin: 3,
+        travelNote: '結志街往上走到士丹頓街，2–3 分鐘。',
+        subs: [],
+      };
+      batch.set(doc(col), item);
+    }
+
+    if (dim) batch.update(dim.ref, { travelMode: 'mrt', travelMin: 25, travelNote: '走回中環站，荃灣線起點坐到太子（不用轉車）。' });
+
+    const fri = find(/bakehouse|蛋塔/i, docs.filter((d) => d.data()['day'] === '2026-11-27'));
+    if (fri) {
+      const note = String(fri.data()['note'] ?? '');
+      const add = '已在 11/26 早上預約（中環店）。建議順序：退房後先到香港站預辦登機、把行李託運掉，再空手上來取蛋塔（上坡不用拖行李），最後走回香港站搭機場快線。';
+      if (!note.includes(add)) batch.update(fri.ref, { note: note ? note + '\n' + add : add });
+    }
+
+    batch.set(doc(this.db!, 'trips', key), { thursdayEats1: true }, { merge: true });
     await batch.commit();
   }
 
