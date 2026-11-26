@@ -116,6 +116,7 @@ export class TripService {
     await this.thursdayDinner(key, snap.data()['thursdayDinner1'] === true);
     await this.dropDimSum(key, snap.data()['dropDimSum1'] === true);
     await this.foldDinner(key, snap.data()['foldDinner1'] === true);
+    await this.thursdayPmq(key, snap.data()['thursdayPmq1'] === true);
     this.start(key, (snap.data()['members'] as string[]) ?? []);
     return true;
   }
@@ -745,6 +746,94 @@ export class TripService {
 
     if (extra && hotpot) batch.delete(extra.ref);
     batch.set(doc(this.db!, 'trips', key), { foldDinner1: true }, { merge: true });
+    await batch.commit();
+  }
+
+  /**
+   * 一次性（11/26 傍晚，已離開女人街）：第 3 天後半段改成 旺角 → PMQ → 晚餐 → 回飯店。
+   * - 新增 PMQ 站（905 巴士到海港政府大樓 → 中環街市 → 半山扶梯）；
+   * - 新增晚餐站：九記牛腩（清湯腩，PMQ 走路就到），備選坤記煲仔小菜；
+   * - 超市、鵝頸橋火鍋移到備選（不刪除）；
+   * - 回飯店改成從上環／中環出發。
+   * 新站已存在就跳過。
+   */
+  private async thursdayPmq(key: string, done: boolean) {
+    if (done) return;
+    const D3 = '2026-11-26';
+    const col = collection(this.db!, 'trips', key, 'items');
+    const day3 = (await getDocs(col)).docs.filter((d) => d.data()['day'] === D3);
+    const find = (re: RegExp) => day3.find((d) => re.test(String(d.data()['title'] ?? '')));
+    const batch = writeBatch(this.db!);
+
+    const home = find(/回飯店/);
+    const mk = find(/^旺角/) ?? find(/SG 秘密花園/);
+    const ho = home ? Number(home.data()['order']) : NaN;
+    const mo = mk ? Number(mk.data()['order']) : NaN;
+    const [o1, o2] = !isNaN(mo) && !isNaN(ho) && mo < ho ? [mo + (ho - mo) / 3, mo + ((ho - mo) * 2) / 3]
+      : !isNaN(ho) ? [ho - 0.6, ho - 0.3]
+      : [Date.now(), Date.now() + 1];
+
+    // 今晚不去了：移到備選，保留原本內容。
+    day3.filter((d) => /超市|鵝頸橋|四季火鍋/.test(String(d.data()['title'] ?? ''))).forEach((d) => batch.update(d.ref, { day: 'pool', order: Date.now() }));
+
+    if (!find(/^PMQ/)) {
+      const item: Omit<Item, 'id'> = {
+        day: D3,
+        type: 'place',
+        title: 'PMQ 元創方*',
+        time: '',
+        endTime: '',
+        stay: 60,
+        hours: '各店不同，店舖多半傍晚就關，先逛再吃晚餐',
+        address: '中環鴨巴甸街 35 號',
+        note: '* 同伴想去。舊警察宿舍改建的文創基地，逛小店、拍白色建築中庭。',
+        done: false,
+        order: o1,
+        travelMode: 'bus',
+        travelMin: 50,
+        travelNote: '旺角西洋菜南街搭 905，坐到「海港政府大樓」下車（港澳碼頭的下一站）。走約 5 分鐘到中環街市，搭中環至半山扶手電梯（10:00 後往上行）到荷李活道下，往西走幾分鐘到鴨巴甸街。不搭扶梯直接走約 17 分鐘，上坡。',
+        subs: [],
+      };
+      batch.set(doc(col), item);
+    }
+
+    if (!find(/九記/)) {
+      const item: Omit<Item, 'id'> = {
+        day: D3,
+        type: 'food',
+        title: '晚餐：九記牛腩（清湯腩，必比登）',
+        time: '',
+        endTime: '',
+        stay: 45,
+        hours: '週一至六 12:30–22:30，週日及公眾假期休',
+        address: '中環歌賦街 21 號',
+        note: '招牌清湯牛腩，配伊麵最掛湯；咖喱牛腩也有名。店小要搭枱，服務很快很「港式」。沒吃過清湯腩，這間就在 PMQ 下面。',
+        done: false,
+        order: o2,
+        travelMode: 'walk',
+        travelMin: 5,
+        travelNote: '從 PMQ 沿鴨巴甸街往下走，轉進歌賦街就到。',
+        subs: [
+          {
+            name: '備選：坤記煲仔小菜（西營盤，必比登）',
+            hours: '每天 17:30–22:30',
+            note: '想吃煲仔飯選這間。招牌白鱔煲仔飯、臘味滑雞飯、油鴨煲仔飯，每份都有飯焦；也有小菜。即叫即煲要等，常排隊，可先打電話 2803 7209。皇后大道西 263 號（另一間在德輔道西 268 號）。從 PMQ 搭的士約 10 分鐘，或走到上環站坐港島線一站到西營盤。',
+            done: false,
+          },
+        ],
+      };
+      batch.set(doc(col), item);
+    }
+
+    if (home) {
+      batch.update(home.ref, {
+        travelMode: 'mrt',
+        travelMin: 35,
+        travelNote: '走到上環站（約 8 分鐘），港島線到金鐘，轉南港島線到黃竹坑。吃坤記的話從西營盤站出發，路線相同。',
+      });
+    }
+
+    batch.set(doc(this.db!, 'trips', key), { thursdayPmq1: true }, { merge: true });
     await batch.commit();
   }
 
