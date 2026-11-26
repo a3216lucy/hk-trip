@@ -118,6 +118,7 @@ export class TripService {
     await this.foldDinner(key, snap.data()['foldDinner1'] === true);
     await this.thursdayPmq(key, snap.data()['thursdayPmq1'] === true);
     await this.dinnerOptions(key, snap.data()['dinnerOptions1'] === true);
+    await this.fridayBreakfast(key, snap.data()['fridayBreakfast1'] === true);
     this.start(key, (snap.data()['members'] as string[]) ?? []);
     return true;
   }
@@ -747,6 +748,64 @@ export class TripService {
 
     if (extra && hotpot) batch.delete(extra.ref);
     batch.set(doc(this.db!, 'trips', key), { foldDinner1: true }, { merge: true });
+    await batch.commit();
+  }
+
+  /**
+   * 一次性（11/27 早上）：最後一天早餐改成取完蛋塔後去勝香園（備選忠記粥品）。
+   * - 刪掉第 4 天原本的早餐站（標題有「早餐」、但不是蛋塔／Bakehouse 那站）；
+   * - Bakehouse 那站標題拿掉「早餐：」，改成取蛋塔；
+   * - 在 Bakehouse 後面加「早餐：勝香園」，已存在就跳過。
+   */
+  private async fridayBreakfast(key: string, done: boolean) {
+    if (done) return;
+    const D4 = '2026-11-27';
+    const col = collection(this.db!, 'trips', key, 'items');
+    const day4 = (await getDocs(col)).docs.filter((d) => d.data()['day'] === D4);
+    const title = (d: { data(): Record<string, unknown> }) => String(d.data()['title'] ?? '');
+    const batch = writeBatch(this.db!);
+
+    const bake = day4.find((d) => /bakehouse|蛋塔/i.test(title(d) + String(d.data()['address'] ?? '')));
+    day4.filter((d) => d !== bake && /早餐/.test(title(d)) && !/勝香園/.test(title(d))).forEach((d) => batch.delete(d.ref));
+    if (bake && /^早餐[：:]/.test(title(bake))) {
+      batch.update(bake.ref, { title: title(bake).replace(/^早餐[：:]\s*買?/, '取') });
+    }
+
+    if (!day4.some((d) => /勝香園/.test(title(d)))) {
+      const bo = bake ? Number(bake.data()['order']) : NaN;
+      const after = day4
+        .map((d) => Number(d.data()['order']))
+        .filter((o) => !isNaN(bo) && o > bo)
+        .sort((a, b) => a - b)[0];
+      const order = isNaN(bo) ? Date.now() : after !== undefined ? (bo + after) / 2 : bo + 1;
+      const item: Omit<Item, 'id'> = {
+        day: D4,
+        type: 'food',
+        title: '早餐：勝香園（番茄通粉、檸蜜脆脆）',
+        time: '',
+        endTime: '',
+        stay: 40,
+        hours: '週一至六 08:00–15:45，週日及公眾假期休；只收現金',
+        address: '中環美輪街 2 號排檔',
+        note: '開業 60 多年的鐵皮大排檔。招牌番茄鮮牛肉通粉約 $42、牛油檸檬汁蜜糖脆脆約 $25；三人點兩碗通粉加一份脆脆分著吃。很熱門可能要排隊，座位在室外。吃完記得留時間回香港站。',
+        done: false,
+        order,
+        travelMode: 'walk',
+        travelMin: 5,
+        travelNote: '從士丹頓街 Bakehouse 走過去幾分鐘。',
+        subs: [
+          {
+            name: '備選：忠記粥品（上環，想喝粥）',
+            hours: '週一至六 07:00–20:00；收現金、八達通',
+            note: '中環機利文新街 32–34 號，上環站 E1 出口走約 3 分鐘。魚片艇仔粥、粟米碎牛粥約 $25，鹹煎餅約 $11，蔥花蝦米腸約 $21；兩碗粥加腸粉、鹹煎餅分著吃。',
+            done: false,
+          },
+        ],
+      };
+      batch.set(doc(col), item);
+    }
+
+    batch.set(doc(this.db!, 'trips', key), { fridayBreakfast1: true }, { merge: true });
     await batch.commit();
   }
 
