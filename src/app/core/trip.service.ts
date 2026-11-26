@@ -115,6 +115,7 @@ export class TripService {
     await this.thursdayEats(key, snap.data()['thursdayEats1'] === true);
     await this.thursdayDinner(key, snap.data()['thursdayDinner1'] === true);
     await this.dropDimSum(key, snap.data()['dropDimSum1'] === true);
+    await this.foldDinner(key, snap.data()['foldDinner1'] === true);
     this.start(key, (snap.data()['members'] as string[]) ?? []);
     return true;
   }
@@ -689,6 +690,61 @@ export class TripService {
     apply('2026-11-27', /早餐|蛋塔/, /^早餐：買蛋塔/, ['title', 'hours', 'address', 'note']);
     apply('2026-11-27', /^退房，?從雅格飯店出發/, /^退房，從雅格飯店出發/, ['note']);
     batch.set(doc(this.db!, 'trips', key), { starPicks2: true }, { merge: true });
+    await batch.commit();
+  }
+
+  /**
+   * 一次性（11/26 下午，修正）：之前誤加成獨立一站的「晚餐：興記菜館煲仔飯（廟街）」刪掉，
+   * 改成放進原本「鵝頸橋四季火鍋*」的選項，走路能到的排前面：華姐清湯腩 → 興記煲仔飯（要搭車，備案）。
+   * 清真牛肉館放到走路就到的「九龍城寨公園」那站。四季煲仔飯、泰國菜不留。
+   */
+  private async foldDinner(key: string, done: boolean) {
+    if (done) return;
+    const col = collection(this.db!, 'trips', key, 'items');
+    const day3 = (await getDocs(col)).docs.filter((d) => d.data()['day'] === '2026-11-26');
+    const find = (re: RegExp) => day3.find((d) => re.test(String(d.data()['title'] ?? '')));
+    const batch = writeBatch(this.db!);
+
+    const extra = find(/^晚餐：興記菜館煲仔飯/);
+    const hotpot = find(/鵝頸橋|四季火鍋/);
+    const walled = find(/九龍城寨/);
+    const old = (extra?.data()['subs'] ?? []) as Sub[];
+    const wahOld = old.find((x) => x.name.includes('華姐'));
+    const halalOld = old.find((x) => x.name.includes('清真牛肉館'));
+
+    if (hotpot) {
+      const subs = ((hotpot.data()['subs'] ?? []) as Sub[]).filter((x) => !/華姐|興記|清真牛肉館/.test(x.name));
+      subs.push({
+        name: '備選（走路約 15 分或坐一站）：華姐清湯腩（天后總店，必比登）',
+        hours: '每天 11:00–22:45；現金、八達通、支付寶',
+        note: '清湯牛腩，也推薦菜肉雲吞、腩汁蘿蔔。天后電氣道 13 號 A1 號舖，從銅鑼灣坐港島線一站到天后，A2 出口對面。店小要搭枱，尖峰排 15–30 分鐘。',
+        done: false,
+        ...(wahOld?.photo ? { photo: wahOld.photo } : { photo: 'https://prod-pics.guide.michelin.com/api/public/content/c8dc1c2eebc5468c967caf573718eb13.jpeg?format=jpeg&w=600&h=600' }),
+      });
+      subs.push({
+        name: '備案（要搭車過海）：興記菜館煲仔飯（廟街）',
+        hours: '每天 13:30–15:30、17:30–23:00，只收現金',
+        note: '想在九龍吃完再過海回飯店才選這家。炭爐即叫即煲：章魚雞粒、臘味、牛肉窩蛋；炸蠔餅份量大可分著吃。油麻地廟街 15 號，從旺角坐荃灣線兩站到油麻地（不用轉車）。',
+        done: false,
+      });
+      batch.update(hotpot.ref, { subs });
+    }
+
+    if (walled) {
+      const subs = [...((walled.data()['subs'] ?? []) as Sub[])];
+      if (!subs.some((x) => x.name.includes('清真牛肉館'))) {
+        subs.push({
+          name: '順路點心：清真牛肉館（走路 5–10 分）',
+          hours: halalOld?.hours ?? '每天 11:00–22:30；現金、八達通、AlipayHK',
+          note: '打鼓嶺道 33–35 號，逛完城寨走過去。招牌牛肉餅一份 2 件約 $50，很多肉汁、很燙。要搭枱、有最低消費、店內禁酒。',
+          done: false,
+        });
+        batch.update(walled.ref, { subs });
+      }
+    }
+
+    if (extra && hotpot) batch.delete(extra.ref);
+    batch.set(doc(this.db!, 'trips', key), { foldDinner1: true }, { merge: true });
     await batch.commit();
   }
 
