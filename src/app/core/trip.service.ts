@@ -117,6 +117,7 @@ export class TripService {
     await this.dropDimSum(key, snap.data()['dropDimSum1'] === true);
     await this.foldDinner(key, snap.data()['foldDinner1'] === true);
     await this.thursdayPmq(key, snap.data()['thursdayPmq1'] === true);
+    await this.dinnerOptions(key, snap.data()['dinnerOptions1'] === true);
     this.start(key, (snap.data()['members'] as string[]) ?? []);
     return true;
   }
@@ -746,6 +747,50 @@ export class TripService {
 
     if (extra && hotpot) batch.delete(extra.ref);
     batch.set(doc(this.db!, 'trips', key), { foldDinner1: true }, { merge: true });
+    await batch.commit();
+  }
+
+  /**
+   * 一次性（11/26 傍晚）：今晚的九記晚餐站補圖，並加上適合食量小的備選（玉葉、水記、生記）；坤記補圖。
+   * 已有的選項不重複加。
+   */
+  private async dinnerOptions(key: string, done: boolean) {
+    if (done) return;
+    const col = collection(this.db!, 'trips', key, 'items');
+    const hit = (await getDocs(col)).docs.find((d) => d.data()['day'] === '2026-11-26' && /九記/.test(String(d.data()['title'] ?? '')));
+    const batch = writeBatch(this.db!);
+    if (hit) {
+      const pic = (id: string) => `https://prod-pics.guide.michelin.com/api/public/content/${id}?format=jpeg&w=600&h=600`;
+      let subs = ((hit.data()['subs'] ?? []) as Sub[]).map((x) => (/坤記/.test(x.name) && !x.photo ? { ...x, photo: pic('6b688368cb3e4dc48f4c4f195b86b79b.jpeg') } : x));
+      const add: Sub[] = [
+        {
+          name: '備選（食量小首選）：玉葉甜品（中環）',
+          hours: '約 13:00–21:00（資料較舊，出發前確認）',
+          note: '百年鐵皮大排檔，入選過必比登。古早味牛腩配伊麵或蛋麵，加上糖不甩、芝麻糊、綠豆沙等糖水，人均約 $40–60。三個人可以每人一碗糖水、牛腩麵分著吃。中環伊利近街 2 號，從 PMQ 走路幾分鐘。最低消費未查到。',
+          done: false,
+        },
+        {
+          name: '備選（PMQ 之前吃）：水記（中環大排檔）',
+          hours: '週一至五，約 17:30 收檔，晚上不開',
+          note: '中環街市旁吉士笠街 2 號的露天大排檔，新鮮牛腩、牛雜、牛舌，選粉麵再選配料，單料約 $50。每人最低消費約 $20，只收現金（網友資料）。份量大，可以兩人分一碗。晚餐時段已收，只能下巴士後先吃。',
+          done: false,
+        },
+        {
+          name: '備選：生記清湯牛腩麵（上環）',
+          hours: '晚上有營業，時間未查證',
+          note: '上環禧利街 20 號的小店，十多個座位，清湯牛腩麵人均約 $48。離海港政府大樓、上環站都近，吃完直接搭港鐵回飯店。最低消費未查到。',
+          done: false,
+        },
+      ];
+      for (const a of add) if (!subs.some((x) => x.name.includes(a.name.split('：')[1].slice(0, 2)))) subs = [...subs, a];
+      const photos = (hit.data()['photos'] as string[] | undefined)?.length ? hit.data()['photos'] : [pic('2fd3c2bd6d2947e58da717a171a7283f.jpeg')];
+      batch.update(hit.ref, {
+        subs,
+        photos,
+        note: String(hit.data()['note'] ?? '') + '\n注意：每人有最低消費（網友資料約 $50，只收現金），三人分一碗不行；食量小可改去玉葉。',
+      });
+    }
+    batch.set(doc(this.db!, 'trips', key), { dinnerOptions1: true }, { merge: true });
     await batch.commit();
   }
 
