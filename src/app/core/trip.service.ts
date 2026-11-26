@@ -113,6 +113,7 @@ export class TripService {
     if (!itineraryDone) await this.moveScale(key, snap.data()['scaleMoved'] === true);
     // 例外：只「新增」選項與一個新站、在備註後面補一句，不改你已經編輯過的欄位，所以最終版之後也照樣跑一次。
     await this.thursdayEats(key, snap.data()['thursdayEats1'] === true);
+    await this.thursdayDinner(key, snap.data()['thursdayDinner1'] === true);
     this.start(key, (snap.data()['members'] as string[]) ?? []);
     return true;
   }
@@ -687,6 +688,72 @@ export class TripService {
     apply('2026-11-27', /早餐|蛋塔/, /^早餐：買蛋塔/, ['title', 'hours', 'address', 'note']);
     apply('2026-11-27', /^退房，?從雅格飯店出發/, /^退房，從雅格飯店出發/, ['note']);
     batch.set(doc(this.db!, 'trips', key), { starPicks2: true }, { merge: true });
+    await batch.commit();
+  }
+
+  /**
+   * 一次性（11/26 下午加的）：廟街之後加一站晚餐「興記菜館煲仔飯」，
+   * 選項放四季煲仔飯、華姐清湯腩佐敦店（未確認開幕）、九龍城泰國菜（備案）。
+   * 已有同名站就跳過，不改其他站。
+   */
+  private async thursdayDinner(key: string, done: boolean) {
+    if (done) return;
+    const D3 = '2026-11-26';
+    const col = collection(this.db!, 'trips', key, 'items');
+    const day3 = (await getDocs(col)).docs.filter((d) => d.data()['day'] === D3);
+    const find = (re: RegExp) => day3.find((d) => re.test(String(d.data()['title'] ?? '')));
+    const batch = writeBatch(this.db!);
+
+    if (!find(/煲仔飯|興記/)) {
+      const temple = find(/廟街/);
+      const home = find(/回飯店/);
+      const orders = day3.map((d) => Number(d.data()['order']) || 0);
+      const to = temple ? Number(temple.data()['order']) : NaN;
+      const ho = home ? Number(home.data()['order']) : NaN;
+      const order = !isNaN(to) && !isNaN(ho) && to < ho ? (to + ho) / 2
+        : !isNaN(to) ? to + 0.5
+        : !isNaN(ho) ? ho - 0.5
+        : (orders.length ? Math.max(...orders) : 0) + 1;
+      const item: Omit<Item, 'id'> = {
+        day: D3,
+        type: 'food',
+        title: '晚餐：興記菜館煲仔飯（廟街）',
+        time: '',
+        endTime: '',
+        stay: 60,
+        hours: '每天 13:30–15:30、17:30–23:00，只收現金',
+        address: '油麻地廟街 15 號（總店；廟街 12–19 號都是興記）',
+        note: '傳統炭爐即叫即煲，要等一下。經典：章魚雞粒、臘味、牛肉窩蛋煲仔飯；炸蠔餅份量大，適合分著吃。吃之前淋店家的煲仔飯豉油。',
+        done: false,
+        order,
+        travelMode: 'walk',
+        travelMin: 3,
+        travelNote: '就在廟街上，逛到一半或逛完再吃都可以。',
+        subs: [
+          {
+            name: '備選：四季煲仔飯',
+            hours: '每天 18:00–01:00',
+            note: '也是炭爐煲仔飯，招牌白鱔排骨、窩蛋牛肉、北菇滑雞；炸鴨蛋蠔餅幾乎每桌都點。油麻地鴉打街 46–58 號，離廟街很近。秋冬常排隊。',
+            done: false,
+          },
+          {
+            name: '備選：華姐清湯腩（佐敦店）',
+            hours: '開幕未確認，出發前用地圖查',
+            note: '天后總店是必比登推介的清湯牛腩。2026 年 5 月有報導說佐敦白加士街（澳洲牛奶公司那條街）要開分店，若已開幕可取代煲仔飯。可用現金、八達通、支付寶。',
+            done: false,
+          },
+          {
+            name: '備案：九龍城泰國菜（逛完城寨時吃）',
+            hours: '小曼谷 11:30–22:00',
+            note: '要選這個就在九龍城寨公園逛完後直接吃，不用等到廟街。小曼谷（南角道 9–11 號）：青咖喱海鮮、即燒串燒，常排隊；泰美味（龍崗道 2–4 號）：泰國人開的，燒青檸牛肉、菠蘿炒飯、肉碎菜包，較平價。',
+            done: false,
+          },
+        ],
+      };
+      batch.set(doc(col), item);
+    }
+
+    batch.set(doc(this.db!, 'trips', key), { thursdayDinner1: true }, { merge: true });
     await batch.commit();
   }
 
