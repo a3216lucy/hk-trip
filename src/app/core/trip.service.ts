@@ -114,6 +114,7 @@ export class TripService {
     // 例外：只「新增」選項與一個新站、在備註後面補一句，不改你已經編輯過的欄位，所以最終版之後也照樣跑一次。
     await this.thursdayEats(key, snap.data()['thursdayEats1'] === true);
     await this.thursdayDinner(key, snap.data()['thursdayDinner1'] === true);
+    await this.dropDimSum(key, snap.data()['dropDimSum1'] === true);
     this.start(key, (snap.data()['members'] as string[]) ?? []);
     return true;
   }
@@ -688,6 +689,19 @@ export class TripService {
     apply('2026-11-27', /早餐|蛋塔/, /^早餐：買蛋塔/, ['title', 'hours', 'address', 'note']);
     apply('2026-11-27', /^退房，?從雅格飯店出發/, /^退房，從雅格飯店出發/, ['note']);
     batch.set(doc(this.db!, 'trips', key), { starPicks2: true }, { merge: true });
+    await batch.commit();
+  }
+
+  /** 一次性（11/26 下午）：照你的要求刪掉第 3 天的「一點心」站。 */
+  private async dropDimSum(key: string, done: boolean) {
+    if (done) return;
+    const col = collection(this.db!, 'trips', key, 'items');
+    const docs = (await getDocs(col)).docs;
+    const batch = writeBatch(this.db!);
+    docs
+      .filter((d) => d.data()['day'] === '2026-11-26' && /一點心/.test(String(d.data()['title'] ?? '')))
+      .forEach((d) => batch.delete(d.ref));
+    batch.set(doc(this.db!, 'trips', key), { dropDimSum1: true }, { merge: true });
     await batch.commit();
   }
 
