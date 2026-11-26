@@ -692,10 +692,11 @@ export class TripService {
 
   /**
    * 一次性（11/26 當天加的）：
-   * 1. 第 3 天早餐那站加 3 個順路備選（澳洲牛奶公司、合益泰小食、新香園）。
-   * 2. 廟街之後插一站 Bakehouse 中環店（回飯店順路）：現買現吃，並預約 11/27 在同一間取的蛋塔。
-   * 3. 11/27 的 Bakehouse 站備註後面補一句：先到香港站託運行李，再空手去取。
-   * 只新增、不覆蓋：已有同名選項或 Bakehouse 站就跳過。
+   * 1. 出發後先到中環：早餐蘭芳園（西多士、絲襪奶茶），備選興記咖啡室、勝香園。
+   * 2. 接著 Bakehouse 中環店：現吃，並預約 11/27 早上在同一間取的蛋塔。
+   * 3. 一點心改成從中環站出發（荃灣線起點直達太子），交通時間跟著改。
+   * 4. 11/27 的 Bakehouse 站備註後面補一句：先到香港站託運行李，再空手去取。
+   * 新站已存在就跳過，不重複新增。
    */
   private async thursdayEats(key: string, done: boolean) {
     if (done) return;
@@ -704,69 +705,80 @@ export class TripService {
     const docs = (await getDocs(col)).docs;
     const day3 = docs.filter((d) => d.data()['day'] === D3);
     const find = (re: RegExp, list = day3) => list.find((d) => re.test(String(d.data()['title'] ?? '')));
+    const ord = (d?: { data(): Record<string, unknown> }) => (d ? Number(d.data()['order']) : NaN);
     const batch = writeBatch(this.db!);
 
-    const breakfast = find(/一點心|早餐/);
-    if (breakfast) {
-      const subs = [...((breakfast.data()['subs'] ?? []) as Sub[])];
-      const extra: Sub[] = [
-        {
-          name: '備選：澳洲牛奶公司（佐敦）',
-          hours: '07:30–22:00',
-          note: '港式茶餐廳：炒蛋、牛油方包、燉奶。佐敦白加士街 47 號，C2 出口走 2 分鐘。同一條荃灣線，提早一站下車就好；09:00 左右會排隊，但翻桌很快。',
-          done: false,
-        },
-        {
-          name: '備選：合益泰小食（深水埗）',
-          hours: '每天 06:30–20:00（米芝蓮指南）',
-          note: '街頭小吃，招牌豬腸粉（混醬）。深水埗桂林街 121 號。直接坐到深水埗站吃，吃完就接著逛深水埗，最順路；可再加公和荳品廠豆腐花。',
-          done: false,
-        },
-        {
-          name: '備選：新香園（深水埗）',
-          hours: '未查到，出發前看地圖',
-          note: '茶餐廳，招牌蛋牛治（煎蛋＋手切牛肉的烤吐司）。深水埗桂林街 38A 號，跟合益泰同一條街。',
-          done: false,
-        },
-      ];
-      extra.forEach((x) => { if (!subs.some((y) => y.name === x.name)) subs.push(x); });
-      batch.update(breakfast.ref, { subs });
+    const start = find(/出發/);
+    const dim = find(/一點心/);
+    const orders = day3.map((d) => Number(d.data()['order']) || 0);
+    const so = ord(start);
+    const dmo = ord(dim);
+    const [o1, o2] = !isNaN(so) && !isNaN(dmo) && so < dmo ? [so + (dmo - so) / 3, so + ((dmo - so) * 2) / 3]
+      : !isNaN(dmo) ? [dmo - 0.6, dmo - 0.3]
+      : !isNaN(so) ? [so + 0.3, so + 0.6]
+      : [(orders.length ? Math.min(...orders) : 0) - 0.6, (orders.length ? Math.min(...orders) : 0) - 0.3];
+
+    if (!find(/蘭芳園/)) {
+      const item: Omit<Item, 'id'> = {
+        day: D3,
+        type: 'food',
+        title: '早餐：蘭芳園（中環）',
+        time: '',
+        endTime: '',
+        stay: 40,
+        hours: '週一至六 07:30–18:00（週日休），只收現金',
+        address: '中環結志街 2 號',
+        note: '港式西多士、絲襪奶茶的老店，也可以點豬扒包。吃完走 2–3 分鐘到 Bakehouse。',
+        done: false,
+        order: o1,
+        travelMode: 'mrt',
+        travelMin: 30,
+        travelNote: '黃竹坑 → 金鐘轉荃灣線坐一站到中環，D2 出口走約 6 分鐘。',
+        subs: [
+          {
+            name: '備選：興記咖啡室（中環）',
+            hours: '早上 06:00 開（來源：鏡週刊）',
+            note: '鐵板煎的傳統西多士（不油炸），放牛油、淋煉乳。在摩羅上街附近，從 Bakehouse 走過去約 10 分鐘，地址出發前用地圖確認。',
+            done: false,
+          },
+          {
+            name: '備選：勝香園（中環）',
+            hours: '開門時間未查到，週日休',
+            note: '露天大排檔，招牌蕃茄牛肉通粉、檸蜜脆脆（沒有西多士）。中環美輪街 2 號，離 Bakehouse 很近。',
+            done: false,
+          },
+        ],
+      };
+      batch.set(doc(col), item);
     }
 
     if (!find(/bakehouse/i)) {
-      const temple = find(/廟街/);
-      const home = find(/回飯店/);
-      const orders = day3.map((d) => Number(d.data()['order']) || 0);
-      const to = temple ? Number(temple.data()['order']) : NaN;
-      const ho = home ? Number(home.data()['order']) : NaN;
-      const order = !isNaN(to) && !isNaN(ho) && to < ho ? (to + ho) / 2
-        : !isNaN(to) ? to + 0.5
-        : !isNaN(ho) ? ho - 0.5
-        : (orders.length ? Math.max(...orders) : 0) + 1;
       const item: Omit<Item, 'id'> = {
         day: D3,
         type: 'food',
         title: 'Bakehouse 蛋塔（中環）',
         time: '',
         endTime: '',
-        stay: 20,
-        hours: '週一至日 08:00–21:00（21:00 關，最晚 20:40 前到）',
+        stay: 15,
+        hours: '週一至日 08:00–21:00',
         address: '中環士丹頓街 5 號嘉彩閣地舖',
-        note: '現買現吃，並預約明天（11/27）早上在這間取的蛋塔。沒有固定出爐時間，邊賣邊烤、賣完為止，晚上可能沒貨，但預約明天的才是重點。廟街約 20:15 前離開。',
+        note: '現吃，並預約明天（11/27）早上在這間取的蛋塔。早上剛開店，貨比晚上多。',
         done: false,
-        order,
-        travelMode: 'mrt',
-        travelMin: 25,
-        travelNote: '佐敦站坐荃灣線直達中環（終點站，不用轉車），走到士丹頓街約 10 分鐘上坡，可搭中環至半山扶手電梯。買完回中環站坐一站到金鐘，轉南港島線回黃竹坑（下一段交通時間比原本估的短）。',
+        order: o2,
+        travelMode: 'walk',
+        travelMin: 3,
+        travelNote: '結志街往上走到士丹頓街，2–3 分鐘。',
         subs: [],
       };
       batch.set(doc(col), item);
     }
 
+    if (dim) batch.update(dim.ref, { travelMode: 'mrt', travelMin: 25, travelNote: '走回中環站，荃灣線起點坐到太子（不用轉車）。' });
+
     const fri = find(/bakehouse|蛋塔/i, docs.filter((d) => d.data()['day'] === '2026-11-27'));
     if (fri) {
       const note = String(fri.data()['note'] ?? '');
-      const add = '已在 11/26 晚上預約（中環店）。建議順序：退房後先到香港站預辦登機、把行李託運掉，再空手上來取蛋塔（上坡不用拖行李），最後走回香港站搭機場快線。';
+      const add = '已在 11/26 早上預約（中環店）。建議順序：退房後先到香港站預辦登機、把行李託運掉，再空手上來取蛋塔（上坡不用拖行李），最後走回香港站搭機場快線。';
       if (!note.includes(add)) batch.update(fri.ref, { note: note ? note + '\n' + add : add });
     }
 
