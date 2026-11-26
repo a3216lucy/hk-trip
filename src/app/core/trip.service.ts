@@ -693,8 +693,8 @@ export class TripService {
   /**
    * 一次性（11/26 當天加的）：
    * 1. 第 3 天早餐那站加 3 個順路備選（澳洲牛奶公司、合益泰小食、新香園）。
-   * 2. 九龍公園和廟街之間插一站 Bakehouse 尖沙咀店：現買現吃，順便預約 11/27 的蛋塔。
-   * 3. 11/27 的 Bakehouse 站備註後面補一句預約提醒。
+   * 2. 廟街之後插一站 Bakehouse 中環店（回飯店順路）：現買現吃，並預約 11/27 在同一間取的蛋塔。
+   * 3. 11/27 的 Bakehouse 站備註後面補一句：先到香港站託運行李，再空手去取。
    * 只新增、不覆蓋：已有同名選項或 Bakehouse 站就跳過。
    */
   private async thursdayEats(key: string, done: boolean) {
@@ -734,30 +734,30 @@ export class TripService {
     }
 
     if (!find(/bakehouse/i)) {
-      const park = find(/九龍公園/);
       const temple = find(/廟街/);
+      const home = find(/回飯店/);
       const orders = day3.map((d) => Number(d.data()['order']) || 0);
-      const po = park ? Number(park.data()['order']) : NaN;
       const to = temple ? Number(temple.data()['order']) : NaN;
-      const order = !isNaN(po) && !isNaN(to) && po < to ? (po + to) / 2
-        : !isNaN(to) ? to - 0.5
-        : !isNaN(po) ? po + 0.5
+      const ho = home ? Number(home.data()['order']) : NaN;
+      const order = !isNaN(to) && !isNaN(ho) && to < ho ? (to + ho) / 2
+        : !isNaN(to) ? to + 0.5
+        : !isNaN(ho) ? ho - 0.5
         : (orders.length ? Math.max(...orders) : 0) + 1;
       const item: Omit<Item, 'id'> = {
         day: D3,
         type: 'food',
-        title: 'Bakehouse 蛋塔（尖沙咀）',
+        title: 'Bakehouse 蛋塔（中環）',
         time: '',
         endTime: '',
         stay: 20,
-        hours: '週一至日 08:00–21:00',
-        address: '尖沙咀漢口道 44 號地下',
-        note: '現買現吃，順便問店員預約明天（11/27）的蛋塔。沒有固定出爐時間，邊賣邊烤、賣完為止，晚上可能沒貨，沒有就直接預約。注意：在這裡預約通常要回這間取；明天是去中環店，請問清楚能不能改到中環店取，不行就另外打電話給中環店預約。',
+        hours: '週一至日 08:00–21:00（21:00 關，最晚 20:40 前到）',
+        address: '中環士丹頓街 5 號嘉彩閣地舖',
+        note: '現買現吃，並預約明天（11/27）早上在這間取的蛋塔。沒有固定出爐時間，邊賣邊烤、賣完為止，晚上可能沒貨，但預約明天的才是重點。廟街約 20:15 前離開。',
         done: false,
         order,
-        travelMode: 'walk',
-        travelMin: 5,
-        travelNote: '漢口道在九龍公園南邊，從海防道那側出公園走幾分鐘。',
+        travelMode: 'mrt',
+        travelMin: 25,
+        travelNote: '佐敦站坐荃灣線直達中環（終點站，不用轉車），走到士丹頓街約 10 分鐘上坡，可搭中環至半山扶手電梯。買完回中環站坐一站到金鐘，轉南港島線回黃竹坑（下一段交通時間比原本估的短）。',
         subs: [],
       };
       batch.set(doc(col), item);
@@ -766,7 +766,7 @@ export class TripService {
     const fri = find(/bakehouse|蛋塔/i, docs.filter((d) => d.data()['day'] === '2026-11-27'));
     if (fri) {
       const note = String(fri.data()['note'] ?? '');
-      const add = '（11/26 晚上在尖沙咀店已問預約，取貨店以店員說的為準。）';
+      const add = '已在 11/26 晚上預約（中環店）。建議順序：退房後先到香港站預辦登機、把行李託運掉，再空手上來取蛋塔（上坡不用拖行李），最後走回香港站搭機場快線。';
       if (!note.includes(add)) batch.update(fri.ref, { note: note ? note + '\n' + add : add });
     }
 
