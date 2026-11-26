@@ -111,6 +111,8 @@ export class TripService {
     if (!itineraryDone) await this.planV2(key, snap.data()['planV2'] === true);
     if (!itineraryDone) await this.dimSumBranches(key, snap.data()['dimSum1'] === true);
     if (!itineraryDone) await this.moveScale(key, snap.data()['scaleMoved'] === true);
+    // 例外：只「新增」選項與一個新站、在備註後面補一句，不改你已經編輯過的欄位，所以最終版之後也照樣跑一次。
+    await this.thursdayEats(key, snap.data()['thursdayEats1'] === true);
     this.start(key, (snap.data()['members'] as string[]) ?? []);
     return true;
   }
@@ -685,6 +687,90 @@ export class TripService {
     apply('2026-11-27', /早餐|蛋塔/, /^早餐：買蛋塔/, ['title', 'hours', 'address', 'note']);
     apply('2026-11-27', /^退房，?從雅格飯店出發/, /^退房，從雅格飯店出發/, ['note']);
     batch.set(doc(this.db!, 'trips', key), { starPicks2: true }, { merge: true });
+    await batch.commit();
+  }
+
+  /**
+   * 一次性（11/26 當天加的）：
+   * 1. 第 3 天早餐那站加 3 個順路備選（澳洲牛奶公司、合益泰小食、新香園）。
+   * 2. 九龍公園和廟街之間插一站 Bakehouse 尖沙咀店：現買現吃，順便預約 11/27 的蛋塔。
+   * 3. 11/27 的 Bakehouse 站備註後面補一句預約提醒。
+   * 只新增、不覆蓋：已有同名選項或 Bakehouse 站就跳過。
+   */
+  private async thursdayEats(key: string, done: boolean) {
+    if (done) return;
+    const D3 = '2026-11-26';
+    const col = collection(this.db!, 'trips', key, 'items');
+    const docs = (await getDocs(col)).docs;
+    const day3 = docs.filter((d) => d.data()['day'] === D3);
+    const find = (re: RegExp, list = day3) => list.find((d) => re.test(String(d.data()['title'] ?? '')));
+    const batch = writeBatch(this.db!);
+
+    const breakfast = find(/一點心|早餐/);
+    if (breakfast) {
+      const subs = [...((breakfast.data()['subs'] ?? []) as Sub[])];
+      const extra: Sub[] = [
+        {
+          name: '備選：澳洲牛奶公司（佐敦）',
+          hours: '07:30–22:00',
+          note: '港式茶餐廳：炒蛋、牛油方包、燉奶。佐敦白加士街 47 號，C2 出口走 2 分鐘。同一條荃灣線，提早一站下車就好；09:00 左右會排隊，但翻桌很快。',
+          done: false,
+        },
+        {
+          name: '備選：合益泰小食（深水埗）',
+          hours: '每天 06:30–20:00（米芝蓮指南）',
+          note: '街頭小吃，招牌豬腸粉（混醬）。深水埗桂林街 121 號。直接坐到深水埗站吃，吃完就接著逛深水埗，最順路；可再加公和荳品廠豆腐花。',
+          done: false,
+        },
+        {
+          name: '備選：新香園（深水埗）',
+          hours: '未查到，出發前看地圖',
+          note: '茶餐廳，招牌蛋牛治（煎蛋＋手切牛肉的烤吐司）。深水埗桂林街 38A 號，跟合益泰同一條街。',
+          done: false,
+        },
+      ];
+      extra.forEach((x) => { if (!subs.some((y) => y.name === x.name)) subs.push(x); });
+      batch.update(breakfast.ref, { subs });
+    }
+
+    if (!find(/bakehouse/i)) {
+      const park = find(/九龍公園/);
+      const temple = find(/廟街/);
+      const orders = day3.map((d) => Number(d.data()['order']) || 0);
+      const po = park ? Number(park.data()['order']) : NaN;
+      const to = temple ? Number(temple.data()['order']) : NaN;
+      const order = !isNaN(po) && !isNaN(to) && po < to ? (po + to) / 2
+        : !isNaN(to) ? to - 0.5
+        : !isNaN(po) ? po + 0.5
+        : (orders.length ? Math.max(...orders) : 0) + 1;
+      const item: Omit<Item, 'id'> = {
+        day: D3,
+        type: 'food',
+        title: 'Bakehouse 蛋塔（尖沙咀）',
+        time: '',
+        endTime: '',
+        stay: 20,
+        hours: '週一至日 08:00–21:00',
+        address: '尖沙咀漢口道 44 號地下',
+        note: '現買現吃，順便問店員預約明天（11/27）的蛋塔。沒有固定出爐時間，邊賣邊烤、賣完為止，晚上可能沒貨，沒有就直接預約。注意：在這裡預約通常要回這間取；明天是去中環店，請問清楚能不能改到中環店取，不行就另外打電話給中環店預約。',
+        done: false,
+        order,
+        travelMode: 'walk',
+        travelMin: 5,
+        travelNote: '漢口道在九龍公園南邊，從海防道那側出公園走幾分鐘。',
+        subs: [],
+      };
+      batch.set(doc(col), item);
+    }
+
+    const fri = find(/bakehouse|蛋塔/i, docs.filter((d) => d.data()['day'] === '2026-11-27'));
+    if (fri) {
+      const note = String(fri.data()['note'] ?? '');
+      const add = '（11/26 晚上在尖沙咀店已問預約，取貨店以店員說的為準。）';
+      if (!note.includes(add)) batch.update(fri.ref, { note: note ? note + '\n' + add : add });
+    }
+
+    batch.set(doc(this.db!, 'trips', key), { thursdayEats1: true }, { merge: true });
     await batch.commit();
   }
 
