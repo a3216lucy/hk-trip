@@ -692,9 +692,9 @@ export class TripService {
   }
 
   /**
-   * 一次性（11/26 下午加的）：廟街之後加一站晚餐「興記菜館煲仔飯」，
-   * 選項放四季煲仔飯、華姐清湯腩佐敦店（未確認開幕）、九龍城泰國菜（備案）。
-   * 已有同名站就跳過，不改其他站。
+   * 一次性（11/26 下午加的）：不新增站，把晚餐備選併進原本的「鵝頸橋四季火鍋*」選項：
+   * 華姐清湯腩（天后總店）、興記菜館煲仔飯（廟街）、清真牛肉館（九龍城）。都是還沒吃過的類型。
+   * 另外替早上加的 Bakehouse（中環）站補一張蛋塔圖。只新增，已有同名選項或已有圖就跳過。
    */
   private async thursdayDinner(key: string, done: boolean) {
     if (done) return;
@@ -704,63 +704,34 @@ export class TripService {
     const find = (re: RegExp) => day3.find((d) => re.test(String(d.data()['title'] ?? '')));
     const batch = writeBatch(this.db!);
 
-    if (!find(/煲仔飯|興記/)) {
-      const temple = find(/廟街/);
-      const home = find(/回飯店/);
-      const orders = day3.map((d) => Number(d.data()['order']) || 0);
-      const to = temple ? Number(temple.data()['order']) : NaN;
-      const ho = home ? Number(home.data()['order']) : NaN;
-      const order = !isNaN(to) && !isNaN(ho) && to < ho ? (to + ho) / 2
-        : !isNaN(to) ? to + 0.5
-        : !isNaN(ho) ? ho - 0.5
-        : (orders.length ? Math.max(...orders) : 0) + 1;
-      const item: Omit<Item, 'id'> = {
-        day: D3,
-        type: 'food',
-        title: '晚餐：興記菜館煲仔飯（廟街）',
-        time: '',
-        endTime: '',
-        stay: 60,
-        hours: '每天 13:30–15:30、17:30–23:00，只收現金',
-        address: '油麻地廟街 15 號（總店；廟街 12–19 號都是興記）',
-        note: '傳統炭爐即叫即煲，要等一下。經典：章魚雞粒、臘味、牛肉窩蛋煲仔飯；炸蠔餅份量大，適合分著吃。吃之前淋店家的煲仔飯豉油。',
-        done: false,
-        order,
-        travelMode: 'walk',
-        travelMin: 3,
-        travelNote: '就在廟街上，逛到一半或逛完再吃都可以。',
-        subs: [
-          {
-            name: '備選：四季煲仔飯',
-            hours: '每天 18:00–01:00',
-            note: '也是炭爐煲仔飯，招牌白鱔排骨、窩蛋牛肉、北菇滑雞；炸鴨蛋蠔餅幾乎每桌都點。油麻地鴉打街 46–58 號，離廟街很近。秋冬常排隊。',
-            done: false,
-          },
-          {
-            name: '備選：華姐清湯腩（佐敦店）',
-            hours: '開幕未確認，出發前用地圖查',
-            note: '天后總店是必比登推介的清湯牛腩。2026 年 5 月有報導說佐敦白加士街（澳洲牛奶公司那條街）要開分店，若已開幕可取代煲仔飯。可用現金、八達通、支付寶。',
-            done: false,
-            photo: 'https://prod-pics.guide.michelin.com/api/public/content/c8dc1c2eebc5468c967caf573718eb13.jpeg?format=jpeg&w=600&h=600',
-          },
-          {
-            name: '備案：九龍城泰國菜（逛完城寨時吃）',
-            hours: '小曼谷 11:30–22:00',
-            note: '要選這個就在九龍城寨公園逛完後直接吃，不用等到廟街。小曼谷（南角道 9–11 號）：青咖喱海鮮、即燒串燒，常排隊；泰美味（龍崗道 2–4 號）：泰國人開的，燒青檸牛肉、菠蘿炒飯、肉碎菜包，較平價。',
-            done: false,
-          },
-          {
-            name: '備案：清真牛肉館（九龍城，逛完城寨時吃）',
-            hours: '每天 11:00–22:30；現金、八達通、AlipayHK',
-            note: '九龍城打鼓嶺道 33–35 號，宋皇臺站 B3 出口走約 4 分鐘。招牌牛肉餅（一份 2 件約 $50）即叫即煎、很多肉汁，很燙要小口吃；也有咖喱牛腩、羊肉煎餃、炸銀絲卷。建議當點心分一份牛肉餅，留胃給煲仔飯。要搭枱、有最低消費、店內禁酒，晚上 7 點前就開始排隊。',
-            done: false,
-          },
-        ],
-      };
-      batch.set(doc(col), item);
+    const hotpot = find(/鵝頸橋|四季火鍋/);
+    if (hotpot) {
+      const subs = [...((hotpot.data()['subs'] ?? []) as Sub[])];
+      const extra: Sub[] = [
+        {
+          name: '備選：華姐清湯腩（天后總店，必比登）',
+          hours: '每天 11:00–22:45；現金、八達通、支付寶',
+          note: '清湯牛腩，也推薦菜肉雲吞、腩汁蘿蔔。天后電氣道 13 號 A1 號舖，從銅鑼灣坐港島線一站到天后，A2 出口對面。店小要搭枱，尖峰排 15–30 分鐘。',
+          done: false,
+          photo: 'https://prod-pics.guide.michelin.com/api/public/content/c8dc1c2eebc5468c967caf573718eb13.jpeg?format=jpeg&w=600&h=600',
+        },
+        {
+          name: '備選：興記菜館煲仔飯（廟街）',
+          hours: '每天 13:30–15:30、17:30–23:00，只收現金',
+          note: '想在九龍吃完再過海回飯店就選這家。炭爐即叫即煲：章魚雞粒、臘味、牛肉窩蛋；炸蠔餅份量大可分著吃。油麻地廟街 15 號，油麻地站走幾分鐘。',
+          done: false,
+        },
+        {
+          name: '備選：清真牛肉館（九龍城）',
+          hours: '每天 11:00–22:30；現金、八達通、AlipayHK',
+          note: '在九龍城寨公園附近（打鼓嶺道 33–35 號，宋皇臺站 B3 出口走 4 分鐘），適合逛城寨時當點心。招牌牛肉餅一份 2 件約 $50，很多肉汁、很燙。要搭枱、有最低消費、店內禁酒。',
+          done: false,
+        },
+      ];
+      extra.forEach((x) => { if (!subs.some((y) => y.name === x.name)) subs.push(x); });
+      batch.update(hotpot.ref, { subs });
     }
 
-    // 早上加的 Bakehouse（中環）站補一張蛋塔圖；已經有圖就不動。
     const bake = find(/bakehouse/i);
     if (bake && !((bake.data()['photos'] as string[] | undefined)?.length)) {
       batch.update(bake.ref, { photos: ['https://d3h1lg3ksw6i6b.cloudfront.net/media/image/2025/06/09/5f4cc11ddb434df2aae28c60365f4581___Bakehouse_egg_tart_sourdough.jpg'] });
